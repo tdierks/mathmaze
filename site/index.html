@@ -12,19 +12,19 @@ body {
 <script src="http://d3js.org/d3.v3.min.js"></script>
 <script>
 
-var width = 480,
-    height = 360;
+var width = 600,
+    height = 500;
 
 var N = 1 << 0,
     S = 1 << 1,
     W = 1 << 2,
     E = 1 << 3;
 
-var cellSize = 16,
+var cellSize = 24,
     cellSpacing = 8,
     cellWidth = Math.floor((width - cellSpacing) / (cellSize + cellSpacing)),
     cellHeight = Math.floor((height - cellSpacing) / (cellSize + cellSpacing)),
-    tokenSize = 8,
+    iconSize = 20,
     game = {
       cells: [],  // each cell’s edge bits
       player: {},
@@ -149,6 +149,7 @@ function drawBoard() {
     }
   }
 
+  drawImage(0, 0, "#laddericon");
   drawExit();
   drawKey();
   drawPlayer();
@@ -174,14 +175,10 @@ function drawKey() {
   }
 }
 
-function drawToken(x, y) {
-  context.fillRect(x * cellSize + (x + 1) * cellSpacing + (cellSize - tokenSize)/2, y * cellSize + (y + 1) * cellSpacing + (cellSize - tokenSize)/2, tokenSize, tokenSize);
-}
-
 function drawImage(x, y, imageSel) {
   var image = d3.select(imageSel).node();
   if (image) {
-    context.drawImage(image, x * cellSize + (x + 1) * cellSpacing, y * cellSize + (y + 1) * cellSpacing, cellSize, cellSize);
+    context.drawImage(image, x * cellSize + (x + 1) * cellSpacing + (cellSize - iconSize)/2, y * cellSize + (y + 1) * cellSpacing + (cellSize - iconSize)/2, iconSize, iconSize);
   }
 }
 
@@ -309,13 +306,14 @@ function popRandom(array) {
 d3.select(self.frameElement).style("height", height + "px");
 
 </script>
-<div>Player: <span id="playerPos"></span></div>
+<div style="display: none">Player: <span id="playerPos"></span></div>
 <div id="announce"></div>
 <div style="display: none">
   <img id="keyicon" src="key.png">
   <img id="heroicon" src="hero.png">
   <img id="exiticon" src="exit.png">
   <img id="openexiticon" src="open-exit.png">
+  <img id="laddericon" src="stairs.png">
 </div>
 </body>
 </html>
