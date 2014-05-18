@@ -4,6 +4,7 @@
 
 body {
   background: #000;
+  color: #ddd;
 }
 
 </style>
@@ -28,8 +29,21 @@ var cellSize = 16,
     frontier = [(cellHeight - 1) * cellWidth];
 
 var tokenSize = 8,
-    playerX = 0,
-    playerY = 0;
+    player = {
+      x: 0,
+      y: 0,
+      hasKey: false,
+      escaped: false,
+    },
+    key = {
+      x: 10,
+      y: 10,
+    },
+    exit = {
+      x: cellWidth - 1,
+      y: cellHeight - 1,
+    }
+    ;
 
 var canvas = d3.select("body").append("canvas")
     .attr("width", width)
@@ -42,33 +56,62 @@ context.translate(
   Math.round((height - cellHeight * cellSize - (cellHeight + 1) * cellSpacing) / 2)
 );
 
-drawBoard();
+d3.timer(function drawTimer() {
+  updateBoard();
+  return true;
+});
 
 document.body.addEventListener("keydown", function keyDownEvent(event) {
   var LEFT = 37, UP = 38, RIGHT = 39, DOWN = 40;
-  var i = playerX + playerY * cellWidth;
+  var i = player.x + player.y * cellWidth;
   if (event.keyCode == RIGHT) {
-    if (playerX+1 < cellWidth && (cells[i] & E)) {
-      playerX += 1;
-      drawBoard();
+    if (player.x+1 < cellWidth && (cells[i] & E)) {
+      player.x += 1;
+      updateBoard();
     }
   } else if (event.keyCode == LEFT) {
-    if (playerX-1 >= 0 && (cells[i] & W)) {
-      playerX -= 1;
-      drawBoard();
+    if (player.x-1 >= 0 && (cells[i] & W)) {
+      player.x -= 1;
+      updateBoard();
     }
   } else if (event.keyCode == DOWN) {
-    if (playerY+1 < cellHeight && (cells[i] & S)) {
-      playerY += 1;
-      drawBoard();
+    if (player.y+1 < cellHeight && (cells[i] & S)) {
+      player.y += 1;
+      updateBoard();
     }
   } else if (event.keyCode == UP) {
-    if (playerY-1 >= 0 && (cells[i] & N)) {
-      playerY -= 1;
-      drawBoard();
+    if (player.y-1 >= 0 && (cells[i] & N)) {
+      player.y -= 1;
+      updateBoard();
     }
   }
 });
+
+function updateBoard() {
+  var message = null;
+  if (player.x == key.x && player.y == key.y) {
+    player.hasKey = true;
+    message = "You found a key!";
+  }
+  
+  if (player.x == exit.x && player.y == exit.y) {
+    if (player.hasKey == true) {
+      player.escaped = true;
+      message = "You escaped!";
+    } else {
+      message = "You need the key!";
+    }
+    
+    var announceSpan = d3.select("#announce").node();
+    if (announceSpan && message) announceSpan.innerHTML = message;
+  }
+
+  drawBoard();
+  
+  var playerSpan = d3.select("#playerPos").node();
+  if (playerSpan) playerSpan.innerHTML =
+    "x = " + player.x + ", y = " + player.y + (player.hasKey ? " has key" : "");
+}
 
 function drawBoard() {
 //   context.clearRect(0, 0, context.width, context.height);
@@ -83,7 +126,40 @@ function drawBoard() {
     }
   }
 
+  drawExit();
+  drawKey();
   drawPlayer();
+}
+
+function drawExit() {
+  if (!player.escaped) {
+    drawImage(exit.x, exit.y, "#exiticon");
+  } else {
+    drawImage(exit.x, exit.y, "#openexiticon");
+  }
+}
+
+function drawPlayer() {
+  if (!player.escaped) {
+    drawImage(player.x, player.y, "#heroicon");
+  }
+}
+
+function drawKey() {
+  if (!player.hasKey) {
+    drawImage(key.x, key.y, "#keyicon");
+  }
+}
+
+function drawToken(x, y) {
+  context.fillRect(x * cellSize + (x + 1) * cellSpacing + (cellSize - tokenSize)/2, y * cellSize + (y + 1) * cellSpacing + (cellSize - tokenSize)/2, tokenSize, tokenSize);
+}
+
+function drawImage(x, y, imageSel) {
+  var image = d3.select(imageSel).node();
+  if (image) {
+    context.drawImage(image, x * cellSize + (x + 1) * cellSpacing, y * cellSize + (y + 1) * cellSpacing, cellSize, cellSize);
+  }
 }
 
 // d3.timer(function() {
@@ -209,11 +285,14 @@ function popRandom(array) {
 
 d3.select(self.frameElement).style("height", height + "px");
 
-function drawPlayer() {
-  context.fillStyle = "#fff";
-  context.fillRect(playerX * cellSize + (playerX + 1) * cellSpacing + (cellSize - tokenSize)/2, playerY * cellSize + (playerY + 1) * cellSpacing + (cellSize - tokenSize)/2, tokenSize, tokenSize);
-}
-
 </script>
+<div>Player: <span id="playerPos"></span></div>
+<div id="announce"></div>
+<div style="display: none">
+  <img id="keyicon" src="key.png">
+  <img id="heroicon" src="hero.png">
+  <img id="exiticon" src="exit.png">
+  <img id="openexiticon" src="open-exit.png">
+</div>
 </body>
 </html>
