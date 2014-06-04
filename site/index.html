@@ -7,306 +7,526 @@ body {
   color: #ddd;
 }
 
+#gameparent {
+  position: relative;
+}
+
+#battle {
+  position: absolute;
+  height: 400px;
+  width: 500px;
+  left: 50px;
+  top: 50px;
+  z-index: 10;
+  background: #abc;
+  display: none;
+}
 </style>
 <body>
 <script src="http://d3js.org/d3.v3.min.js"></script>
 <script>
 
-var width = 600,
-    height = 500;
+Game = function Game() {
+  var width = 600,
+      height = 500;
 
-var N = 1 << 0,
-    S = 1 << 1,
-    W = 1 << 2,
-    E = 1 << 3;
-
-var cellSize = 24,
-    cellSpacing = 8,
-    cellWidth = Math.floor((width - cellSpacing) / (cellSize + cellSpacing)),
-    cellHeight = Math.floor((height - cellSpacing) / (cellSize + cellSpacing)),
-    iconSize = 20,
-    game = {
-      cells: [],  // each cell’s edge bits
-      player: {},
-      key: {},
-      exit: {},
-    };
-//     distance = d3.range(cellWidth * cellHeight).map(function() { return 0; }),
-//     frontier = [(cellHeight - 1) * cellWidth];
-
-var canvas = d3.select("body").append("canvas")
-    .attr("width", width)
-    .attr("height", height);
-
-var context = canvas.node().getContext("2d");
-
-context.translate(
-  Math.round((width - cellWidth * cellSize - (cellWidth + 1) * cellSpacing) / 2),
-  Math.round((height - cellHeight * cellSize - (cellHeight + 1) * cellSpacing) / 2)
-);
-
-initLevel();
-
-document.body.addEventListener("keydown", function keyDownEvent(event) {
+  var N = 1 << 0,
+      S = 1 << 1,
+      W = 1 << 2,
+      E = 1 << 3;
   var LEFT = 37, UP = 38, RIGHT = 39, DOWN = 40;
-  var i = game.player.x + game.player.y * cellWidth;
-  if (event.keyCode == RIGHT) {
-    if (game.player.x+1 < cellWidth && (game.cells[i] & E)) {
-      game.player.x += 1;
-      updateBoard();
-    }
-  } else if (event.keyCode == LEFT) {
-    if (game.player.x-1 >= 0 && (game.cells[i] & W)) {
-      game.player.x -= 1;
-      updateBoard();
-    }
-  } else if (event.keyCode == DOWN) {
-    if (game.player.y+1 < cellHeight && (game.cells[i] & S)) {
-      game.player.y += 1;
-      updateBoard();
-    }
-  } else if (event.keyCode == UP) {
-    if (game.player.y-1 >= 0 && (game.cells[i] & N)) {
-      game.player.y -= 1;
-      updateBoard();
-    }
-  }
-});
 
-function initLevel() {
-  game.cells = generateMaze(cellWidth, cellHeight);
-  game.player = {
-    x: 0,
-    y: 0,
-    hasKey: false,
-    escaped: false,
-  };
-  game.key = {
-    x: cellWidth-1,
-    y: cellHeight-1,
-  };
-  if (Math.random() < 0.5) {
-    game.key.x = 0;
-  } else {
-    game.key.y = 0;
-  }
-  game.exit = {
-    x: cellWidth - 1,
-    y: cellHeight - 1,
-  };
-  
-  d3.timer(function drawTimer() {
-    updateBoard();
-    var announceSpan = d3.select("#announce").node();
-    if (announceSpan) announceSpan.innerHTML = "";
-    return true;
-  });
-}
+  var cellSize = 24,
+      cellSpacing = 8,
+      cellWidth = Math.floor((width - cellSpacing) / (cellSize + cellSpacing)),
+      cellHeight = Math.floor((height - cellSpacing) / (cellSize + cellSpacing)),
+      iconSize = 20,
+      game = {
+        cells: [],  // each cell’s edge bits
+        player: {},
+        key: {},
+        exit: {},
+        monsters: [],
+      };
+  //     distance = d3.range(cellWidth * cellHeight).map(function() { return 0; }),
+  //     frontier = [(cellHeight - 1) * cellWidth];
 
-function updateBoard() {
-  var message = null;
-  if (game.player.x == game.key.x && game.player.y == game.key.y) {
-    game.player.hasKey = true;
-    message = "You found a game.key!";
-  }
-  
-  if (game.player.x == game.exit.x && game.player.y == game.exit.y) {
-    if (game.player.hasKey == true) {
-      game.player.escaped = true;
-      
-      message = "You escaped!";
-      
-      d3.timer(function resetLevel() {
-        initLevel();
-        return true;
-      }, 3000);
+  var canvas = d3.select("#gameparent").append("canvas")
+      .attr("width", width)
+      .attr("height", height);
+
+  var context = canvas.node().getContext("2d");
+
+  context.translate(
+    Math.round((width - cellWidth * cellSize - (cellWidth + 1) * cellSpacing) / 2),
+    Math.round((height - cellHeight * cellSize - (cellHeight + 1) * cellSpacing) / 2)
+  );
+
+  initLevel();
+
+  document.body.addEventListener("keydown", function keyDownEvent(event) {
+    if (game.inBattle) {
+      game.battleAnswer(event.keyCode);
     } else {
-      message = "You need the key!";
+      movePlayer(event);
     }
+  });
+
+  function movePlayer(event) {
+    var i = game.player.x + game.player.y * cellWidth;
+    if (event.keyCode == RIGHT) {
+      if (game.player.x+1 < cellWidth && (game.cells[i] & E)) {
+        game.player.x += 1;
+        updateBoard();
+      }
+    } else if (event.keyCode == LEFT) {
+      if (game.player.x-1 >= 0 && (game.cells[i] & W)) {
+        game.player.x -= 1;
+        updateBoard();
+      }
+    } else if (event.keyCode == DOWN) {
+      if (game.player.y+1 < cellHeight && (game.cells[i] & S)) {
+        game.player.y += 1;
+        updateBoard();
+      }
+    } else if (event.keyCode == UP) {
+      if (game.player.y-1 >= 0 && (game.cells[i] & N)) {
+        game.player.y -= 1;
+        updateBoard();
+      }
+    }
+  }
+
+  function initLevel() {
+    game.cells = generateMaze(cellWidth, cellHeight);
+    game.player = {
+      x: 0,
+      y: 0,
+      hasKey: false,
+      escaped: false,
+    };
+    game.key = {
+      x: cellWidth-1,
+      y: cellHeight-1,
+    };
+    if (Math.random() < 0.5) {
+      game.key.x = 0;
+    } else {
+      game.key.y = 0;
+    }
+    game.exit = {
+      x: cellWidth - 1,
+      y: cellHeight - 1,
+    };
+    game.monsters = [{
+        alive: true,
+        x: 7,
+        y: 7,
+        speedNum: 1,
+        speedDenom: 2,
+        speedAccrued: 0,
+        icon: "#additionmonster",
+        battleTime: 0,
+        problem: additionProblem,
+      }, {
+        alive: true,
+        x: 12,
+        y: 12,
+        speedNum: 2,
+        speedDenom: 1,
+        speedAccrued: 0,
+        icon: "#additionmonster",
+        battleTime: 0,
+        problem: additionProblem,
+      },
+    ];
+    game.inBattle = false;
+  
+    d3.timer(function drawTimer() {
+      drawBoard();
+      var announceSpan = d3.select("#announce").node();
+      if (announceSpan) announceSpan.innerHTML = "";
+      return true;
+    });
+  }
+
+  function updateBoard() {
+    moveMonsters();
     
+    for (var i = 0; i < game.monsters.length; ++i) {
+      if (game.monsters[i].alive && game.player.x == game.monsters[i].x && game.player.y == game.monsters[i].y) {
+        battle(game.monsters[i]);
+      }
+    }
+  
+    var message = null;
+    if (game.player.x == game.key.x && game.player.y == game.key.y) {
+      game.player.hasKey = true;
+      message = "You found a key!";
+    }
+  
+    if (game.player.x == game.exit.x && game.player.y == game.exit.y) {
+      if (game.player.hasKey == true) {
+        game.player.escaped = true;
+      
+        message = "You escaped!";
+      
+        d3.timer(function resetLevel() {
+          initLevel();
+          return true;
+        }, 3000);
+      } else {
+        message = "You need the key!";
+      }
+    }
+  
     var announceSpan = d3.select("#announce").node();
     if (announceSpan && message) announceSpan.innerHTML = message;
+    drawBoard();
+  
+    var playerSpan = d3.select("#playerPos").node();
+    if (playerSpan) playerSpan.innerHTML =
+      "x = " + game.player.x + ", y = " + game.player.y + (game.player.hasKey ? " has key" : "");
   }
 
-  drawBoard();
+  function battle(monster) {
+    startBattle(monster);
+  }
   
-  var playerSpan = d3.select("#playerPos").node();
-  if (playerSpan) playerSpan.innerHTML =
-    "x = " + game.player.x + ", y = " + game.player.y + (game.player.hasKey ? " has key" : "");
-}
+  function randBetween(min, max) {
+    return Math.floor(Math.random() * (max - min) + min);
+  }
+  
+  function randomOrder(arr) {
+    for (var i = 0, len = arr.length; i < len; ++i) {
+      var j = randBetween(i, len);
+      if (i != j) {
+        var temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+      }
+    }
+    return arr;
+  }
+  
+  function additionProblem(monster) {
+    var a = randBetween(2, 10);
+    var b = randBetween(2, 10);
+    var answers = [
+      a + b - 2,
+      a + b - 1,
+      a + b + 1,
+    ];
+    answers = randomOrder(answers);
+    var index = randBetween(0, answers.length + 1);
+    answers.splice(index, 0, a + b);
+    
+    return {
+      problem: "" + a + " + " + b,
+      answers: answers,
+      correct: index
+    };
+  }
 
-function drawBoard() {
-  context.fillStyle = "#000";
-  context.fillRect(0, 0, width, height);
+  function startBattle(monster) {
+    var battleDone = false;
+    var box = d3.select("#battle")[0][0];
+    box.style.display = "block";
+    var problem = monster.problem(monster);
+    
+    box.innerHTML = "A battle! What is " + problem.problem + "?" +
+      "<ul>" +
+      "<li>UP: " + problem.answers[0] + "</li>" +
+      "<li>RIGHT: " + problem.answers[1] + "</li>" +
+      "<li>DOWN: " + problem.answers[2] + "</li>" +
+      "<li>LEFT: " + problem.answers[3] + "</li>" +
+      "</ul>";
+    
+    game.inBattle = true;
+    game.battleAnswer = function(keyCode) {
+      if (keyCode == UP && problem.correct == 0 ||
+          keyCode == RIGHT && problem.correct == 1 ||
+          keyCode == DOWN && problem.correct == 2 ||
+          keyCode == LEFT && problem.correct == 3) {
+        winBattle(monster);
+        battleDone = true;
+      } else {
+        loseBattle(monster);
+        battleDone = true;
+      }
+    }
+    if (monster.battleTime) {
+      d3.timer(function() {
+        if (!battleDone) {
+          loseBattle(monster);
+        }
+        return true;
+      }, monster.battleTime);
+    }
+  }
   
-  for (var y = 0, i = 0; y < cellHeight; ++y) {
-    for (var x = 0; x < cellWidth; ++x, ++i) {
-      context.fillStyle = "#888";
-      fillCell(i);
-      context.fillStyle = "#888";
-      if (game.cells[i] & S) fillSouth(i);
-      if (game.cells[i] & E) fillEast(i);
+  function winBattle(monster) {
+    monster.alive = false;
+    endBattle();
+  }
+  
+  function loseBattle(monster) {
+    game.player.x = 0;
+    game.player.y = 0;
+    
+    endBattle();
+  }
+  
+  function endBattle() {
+    d3.select("#battle")[0][0].style.display = "none";
+    game.inBattle = false;
+    drawBoard();
+  }
+  
+  function drawBoard() {
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, width, height);
+  
+    for (var y = 0, i = 0; y < cellHeight; ++y) {
+      for (var x = 0; x < cellWidth; ++x, ++i) {
+        context.fillStyle = "#888";
+        fillCell(i);
+        context.fillStyle = "#888";
+        if (game.cells[i] & S) fillSouth(i);
+        if (game.cells[i] & E) fillEast(i);
+      }
+    }
+
+    drawImage(0, 0, "#laddericon");
+    drawExit();
+    drawKey();
+    drawMonsters();
+    drawPlayer();
+  }
+
+  function drawExit() {
+    if (!game.player.escaped) {
+      drawImage(game.exit.x, game.exit.y, "#exiticon");
+    } else {
+      drawImage(game.exit.x, game.exit.y, "#openexiticon");
     }
   }
 
-  drawImage(0, 0, "#laddericon");
-  drawExit();
-  drawKey();
-  drawPlayer();
-}
-
-function drawExit() {
-  if (!game.player.escaped) {
-    drawImage(game.exit.x, game.exit.y, "#exiticon");
-  } else {
-    drawImage(game.exit.x, game.exit.y, "#openexiticon");
+  function drawMonsters() {
+    for (var i = 0; i < game.monsters.length; ++i) {
+      if (game.monsters[i].alive)
+        drawImage(game.monsters[i].x, game.monsters[i].y, game.monsters[i].icon);
+    }
   }
-}
 
-function drawPlayer() {
-  if (!game.player.escaped) {
-    drawImage(game.player.x, game.player.y, "#heroicon");
-  }
-}
-
-function drawKey() {
-  if (!game.player.hasKey) {
-    drawImage(game.key.x, game.key.y, "#keyicon");
-  }
-}
-
-function drawImage(x, y, imageSel) {
-  var image = d3.select(imageSel).node();
-  if (image) {
-    context.drawImage(image, x * cellSize + (x + 1) * cellSpacing + (cellSize - iconSize)/2, y * cellSize + (y + 1) * cellSpacing + (cellSize - iconSize)/2, iconSize, iconSize);
-  }
-}
-
-// d3.timer(function() {
-//   for (var i = 0; i < 50; ++i) {
-//     if (exploreFrontier()) {
-//       drawPlayer();
-//       return true;
-//     }
-//   }
-// });
-// 
-// function exploreFrontier() {
-//   if ((i0 = popRandom(frontier)) == null) return true;
-//   var i0,
-//       i1,
-//       d0 = distance[i0],
-//       d1 = d0 + 1;
-// 
-//   context.fillStyle = d3.hsl(d0 % 360, 1, .5) + "";
-//   fillCell(i0);
-// 
-//   context.fillStyle = d3.hsl(d1 % 360, 1, .5) + "";
-//   if (game.cells[i0] & E && !distance[i1 = i0 + 1]) distance[i1] = d1, fillEast(i0), frontier.push(i1);
-//   if (game.cells[i0] & W && !distance[i1 = i0 - 1]) distance[i1] = d1, fillEast(i1), frontier.push(i1);
-//   if (game.cells[i0] & S && !distance[i1 = i0 + cellWidth]) distance[i1] = d1, fillSouth(i0), frontier.push(i1);
-//   if (game.cells[i0] & N && !distance[i1 = i0 - cellWidth]) distance[i1] = d1, fillSouth(i1), frontier.push(i1);
-// }
-
-function fillCell(i) {
-  var x = i % cellWidth, y = i / cellWidth | 0;
-  context.fillRect(x * cellSize + (x + 1) * cellSpacing, y * cellSize + (y + 1) * cellSpacing, cellSize, cellSize);
-}
-
-function fillEast(i) {
-  var x = i % cellWidth, y = i / cellWidth | 0;
-  context.fillRect((x + 1) * (cellSize + cellSpacing), y * cellSize + (y + 1) * cellSpacing, cellSpacing, cellSize);
-}
-
-function fillSouth(i) {
-  var x = i % cellWidth, y = i / cellWidth | 0;
-  context.fillRect(x * cellSize + (x + 1) * cellSpacing, (y + 1) * (cellSize + cellSpacing), cellSize, cellSpacing);
-}
-
-function generateMaze(width, height) {
-  var cells = new Array(width * height), // each cell’s edge bits
-      remaining = d3.range(width * height), // cell indexes to visit
-      previous = new Array(width * height); // current random walk
-
-  // Add the starting cell.
-  var start = remaining.pop();
-  cells[start] = 0;
-
-  // While there are remaining cells,
-  // add a loop-erased random walk to the maze.
-  while (!loopErasedRandomWalk());
-
-  return cells;
-
-  function loopErasedRandomWalk() {
-    var i0,
-        i1,
-        x0,
-        y0;
-
-    // Pick a location that’s not yet in the maze (if any).
-    do if ((i0 = remaining.pop()) == null) return true;
-    while (cells[i0] >= 0);
-
-    // Perform a random walk starting at this location,
-    previous[i0] = i0;
-    while (true) {
-      x0 = i0 % width;
-      y0 = i0 / width | 0;
-
-      // picking a legal random direction at each step.
-      i1 = Math.random() * 4 | 0;
-      if (i1 === 0) { if (y0 <= 0) continue; --y0, i1 = i0 - width; }
-      else if (i1 === 1) { if (y0 >= height - 1) continue; ++y0, i1 = i0 + width; }
-      else if (i1 === 2) { if (x0 <= 0) continue; --x0, i1 = i0 - 1; }
-      else { if (x0 >= width - 1) continue; ++x0, i1 = i0 + 1; }
-
-      // If this new cell was visited previously during this walk,
-      // erase the loop, rewinding the path to its earlier state.
-      if (previous[i1] >= 0) eraseWalk(i0, i1);
-
-      // Otherwise, just add it to the walk.
-      else previous[i1] = i0;
-
-      // If this cell is part of the maze, we’re done walking.
-      if (cells[i1] >= 0) {
-
-        // Add the random walk to the maze by backtracking to the starting cell.
-        // Also erase this walk’s history to not interfere with subsequent walks.
-        while ((i0 = previous[i1]) !== i1) {
-          if (i1 === i0 + 1) cells[i0] |= E, cells[i1] |= W;
-          else if (i1 === i0 - 1) cells[i0] |= W, cells[i1] |= E;
-          else if (i1 === i0 + width) cells[i0] |= S, cells[i1] |= N;
-          else cells[i0] |= N, cells[i1] |= S;
-          previous[i1] = NaN;
-          i1 = i0;
+  function moveMonsters() {
+    for (var i = 0; i < game.monsters.length; ++i) {
+      if (game.monsters[i].alive) {
+        game.monsters[i].speedAccrued += game.monsters[i].speedNum;
+        if (game.monsters[i].speedAccrued >= game.monsters[i].speedDenom) {
+          var path = findPath(game.cells, game.monsters[i].x, game.monsters[i].y, game.player.x, game.player.y);
+          while (game.monsters[i].speedAccrued >= game.monsters[i].speedDenom && path.length > 0) {
+            game.monsters[i].speedAccrued -= game.monsters[i].speedDenom;
+            var step = path.shift();
+            game.monsters[i].x = step % cellWidth;
+            game.monsters[i].y = Math.floor(step/cellWidth);
+          }
         }
+      }
+    }
+  }
 
-        previous[i1] = NaN;
+  function drawPlayer() {
+    if (!game.player.escaped) {
+      drawImage(game.player.x, game.player.y, "#heroicon");
+    }
+  }
+
+  function drawKey() {
+    if (!game.player.hasKey) {
+      drawImage(game.key.x, game.key.y, "#keyicon");
+    }
+  }
+
+  function drawImage(x, y, imageSel) {
+    var image = d3.select(imageSel).node();
+    if (image) {
+      context.drawImage(image, x * cellSize + (x + 1) * cellSpacing + (cellSize - iconSize)/2, y * cellSize + (y + 1) * cellSpacing + (cellSize - iconSize)/2, iconSize, iconSize);
+    }
+  }
+
+  function findPath(cells, startX, startY, endX, endY) {
+    var visitedCells = d3.range(cellWidth * cellHeight).map(function() { return -1; });
+    var frontier = [];
+    var endI = toI(endX, endY);
+  
+    visitedCells[toI(startX, startY)] = 9999; // sentinel for start
+    frontier.push(toI(startX, startY));
+    while (frontier.length) {
+      var i = frontier.shift();
+      if (i == endI) {
+        var path = [];
+        var iPos = i;
+        while (1) {
+          if (visitedCells[iPos] == 9999) {
+            return path;
+          }
+          path.unshift(iPos);
+          iPos = visitedCells[iPos];
+        }
+        return path;
+      }
+      if (cells[i] & N) visit(i - cellWidth, i);
+      if (cells[i] & S) visit(i + cellWidth, i);
+      if (cells[i] & W) visit(i - 1, i);
+      if (cells[i] & E) visit(i + 1, i);
+    }
+    console.log("Couldn't find path!");
+    return [];
+  
+    function visit(i, from) {
+      if (visitedCells[i] > 0) {
         return;
       }
-
-      i0 = i1;
+      visitedCells[i] = from;
+      frontier.push(i);
     }
   }
 
-  function eraseWalk(i0, i2) {
-    var i1;
-    do i1 = previous[i0], previous[i0] = NaN, i0 = i1; while (i1 !== i2);
+  function toI(x, y) {
+    return x + cellWidth * y;
   }
-}
 
-function popRandom(array) {
-  if (!array.length) return null;
-  var n = array.length, i = Math.random() * n | 0, t;
-  t = array[i], array[i] = array[n - 1], array[n - 1] = t;
-  return array.pop();
-}
+  // d3.timer(function() {
+  //   for (var i = 0; i < 50; ++i) {
+  //     if (exploreFrontier()) {
+  //       drawPlayer();
+  //       return true;
+  //     }
+  //   }
+  // });
+  // 
+  // function exploreFrontier() {
+  //   if ((i0 = popRandom(frontier)) == null) return true;
+  //   var i0,
+  //       i1,
+  //       d0 = distance[i0],
+  //       d1 = d0 + 1;
+  // 
+  //   context.fillStyle = d3.hsl(d0 % 360, 1, .5) + "";
+  //   fillCell(i0);
+  // 
+  //   context.fillStyle = d3.hsl(d1 % 360, 1, .5) + "";
+  //   if (game.cells[i0] & E && !distance[i1 = i0 + 1]) distance[i1] = d1, fillEast(i0), frontier.push(i1);
+  //   if (game.cells[i0] & W && !distance[i1 = i0 - 1]) distance[i1] = d1, fillEast(i1), frontier.push(i1);
+  //   if (game.cells[i0] & S && !distance[i1 = i0 + cellWidth]) distance[i1] = d1, fillSouth(i0), frontier.push(i1);
+  //   if (game.cells[i0] & N && !distance[i1 = i0 - cellWidth]) distance[i1] = d1, fillSouth(i1), frontier.push(i1);
+  // }
 
-d3.select(self.frameElement).style("height", height + "px");
+  function fillCell(i) {
+    var x = i % cellWidth, y = i / cellWidth | 0;
+    context.fillRect(x * cellSize + (x + 1) * cellSpacing, y * cellSize + (y + 1) * cellSpacing, cellSize, cellSize);
+  }
+
+  function fillEast(i) {
+    var x = i % cellWidth, y = i / cellWidth | 0;
+    context.fillRect((x + 1) * (cellSize + cellSpacing), y * cellSize + (y + 1) * cellSpacing, cellSpacing, cellSize);
+  }
+
+  function fillSouth(i) {
+    var x = i % cellWidth, y = i / cellWidth | 0;
+    context.fillRect(x * cellSize + (x + 1) * cellSpacing, (y + 1) * (cellSize + cellSpacing), cellSize, cellSpacing);
+  }
+
+  function generateMaze(width, height) {
+    var cells = new Array(width * height), // each cell’s edge bits
+        remaining = d3.range(width * height), // cell indexes to visit
+        previous = new Array(width * height); // current random walk
+
+    // Add the starting cell.
+    var start = remaining.pop();
+    cells[start] = 0;
+
+    // While there are remaining cells,
+    // add a loop-erased random walk to the maze.
+    while (!loopErasedRandomWalk());
+
+    return cells;
+
+    function loopErasedRandomWalk() {
+      var i0,
+          i1,
+          x0,
+          y0;
+
+      // Pick a location that’s not yet in the maze (if any).
+      do if ((i0 = remaining.pop()) == null) return true;
+      while (cells[i0] >= 0);
+
+      // Perform a random walk starting at this location,
+      previous[i0] = i0;
+      while (true) {
+        x0 = i0 % width;
+        y0 = i0 / width | 0;
+
+        // picking a legal random direction at each step.
+        i1 = Math.random() * 4 | 0;
+        if (i1 === 0) { if (y0 <= 0) continue; --y0, i1 = i0 - width; }
+        else if (i1 === 1) { if (y0 >= height - 1) continue; ++y0, i1 = i0 + width; }
+        else if (i1 === 2) { if (x0 <= 0) continue; --x0, i1 = i0 - 1; }
+        else { if (x0 >= width - 1) continue; ++x0, i1 = i0 + 1; }
+
+        // If this new cell was visited previously during this walk,
+        // erase the loop, rewinding the path to its earlier state.
+        if (previous[i1] >= 0) eraseWalk(i0, i1);
+
+        // Otherwise, just add it to the walk.
+        else previous[i1] = i0;
+
+        // If this cell is part of the maze, we’re done walking.
+        if (cells[i1] >= 0) {
+
+          // Add the random walk to the maze by backtracking to the starting cell.
+          // Also erase this walk’s history to not interfere with subsequent walks.
+          while ((i0 = previous[i1]) !== i1) {
+            if (i1 === i0 + 1) cells[i0] |= E, cells[i1] |= W;
+            else if (i1 === i0 - 1) cells[i0] |= W, cells[i1] |= E;
+            else if (i1 === i0 + width) cells[i0] |= S, cells[i1] |= N;
+            else cells[i0] |= N, cells[i1] |= S;
+            previous[i1] = NaN;
+            i1 = i0;
+          }
+
+          previous[i1] = NaN;
+          return;
+        }
+
+        i0 = i1;
+      }
+    }
+
+    function eraseWalk(i0, i2) {
+      var i1;
+      do i1 = previous[i0], previous[i0] = NaN, i0 = i1; while (i1 !== i2);
+    }
+  }
+
+  function popRandom(array) {
+    if (!array.length) return null;
+    var n = array.length, i = Math.random() * n | 0, t;
+    t = array[i], array[i] = array[n - 1], array[n - 1] = t;
+    return array.pop();
+  }
+
+  d3.select(self.frameElement).style("height", height + "px");
+};
+window.onload = Game;
 
 </script>
 <div style="display: none">Player: <span id="playerPos"></span></div>
+<div id="gameparent">
+<div id="battle">Hi Monster</div>
+</div>
 <div id="announce"></div>
 <div style="display: none">
   <img id="keyicon" src="key.png">
@@ -314,6 +534,7 @@ d3.select(self.frameElement).style("height", height + "px");
   <img id="exiticon" src="exit.png">
   <img id="openexiticon" src="open-exit.png">
   <img id="laddericon" src="stairs.png">
+  <img id="additionmonster" src="addition-monster-2.png">
 </div>
 </body>
 </html>
